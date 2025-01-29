@@ -285,8 +285,8 @@ def get_lin_function(x1: float = 256, y1: float = 0.5, x2: float = 4096, y2: flo
 def get_schedule(
     num_steps: int,
     image_seq_len: int,
-    base_shift: float = 0.5,
-    max_shift: float = 1.15,
+    base_shift: float = 0.7,
+    max_shift: float = 3.0,
     shift: bool = True,
 ) -> list[float]:
     # extra step for zero
