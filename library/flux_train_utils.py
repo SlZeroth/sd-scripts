@@ -285,8 +285,8 @@ def get_lin_function(x1: float = 256, y1: float = 0.5, x2: float = 4096, y2: flo
 def get_schedule(
     num_steps: int,
     image_seq_len: int,
-    base_shift: float = 0.7,
-    max_shift: float = 3.0,
+    base_shift: float = 0.5,
+    max_shift: float = 1.15,
     shift: bool = True,
 ) -> list[float]:
     # extra step for zero
@@ -410,10 +410,21 @@ def compute_loss_weighting_for_sd3(weighting_scheme: str, sigmas=None):
 
 
 def get_noisy_model_input_and_timesteps(
-    args, noise_scheduler, latents, noise, device, dtype
+    args, noise_scheduler, latents, noise, device, dtype, global_step
 ) -> Tuple[torch.Tensor, torch.Tensor, torch.Tensor]:
     bsz, _, h, w = latents.shape
     sigmas = None
+
+    if hasattr(args, "timestep_se_steps") and args.timestep_se_steps is not None:
+        if global_step < args.timestep_se_steps:
+            ratio = global_step / args.timestep_se_steps
+            current_shift = (1 - ratio) * args.discrete_flow_shift + ratio * args.timestep_e_shift
+        else:
+            current_shift = args.timestep_e_shift
+    else:
+        # No dynamic shift; use the fixed shift.
+        current_shift = args.discrete_flow_shift
+    logger.info(f"step: {global_step}, current_shift: {current_shift}")
 
     if args.timestep_sampling == "uniform" or args.timestep_sampling == "sigmoid":
         # Simple random t-based noise sampling
@@ -422,6 +433,9 @@ def get_noisy_model_input_and_timesteps(
             t = torch.sigmoid(args.sigmoid_scale * torch.randn((bsz,), device=device))
         else:
             t = torch.rand((bsz,), device=device)
+
+        # Apply the shift transformation.
+        t = (t * current_shift) / (1 + (current_shift - 1) * t)
 
         timesteps = t * 1000.0
         t = t.view(-1, 1, 1, 1)
@@ -440,6 +454,10 @@ def get_noisy_model_input_and_timesteps(
         logits_norm = torch.randn(bsz, device=device)
         logits_norm = logits_norm * args.sigmoid_scale  # larger scale for more uniform sampling
         timesteps = logits_norm.sigmoid()
+
+        # Apply the shift transformation.
+        timesteps = (timesteps * current_shift) / (1 + (current_shift - 1) * timesteps)
+
         mu = get_lin_function(y1=0.5, y2=1.15)((h // 2) * (w // 2))
         timesteps = time_shift(mu, 1.0, timesteps)
 
@@ -616,4 +634,22 @@ def add_flux_train_arguments(parser: argparse.ArgumentParser):
         type=float,
         default=3.0,
         help="Discrete flow shift for the Euler Discrete Scheduler, default is 3.0. / Euler Discrete Schedulerの離散フローシフト、デフォルトは3.0。",
+    )
+    parser.add_argument(
+        "--timestep_s_shift",
+        type=float,
+        default=None,
+        help="Shift for the timestep sampling, default is None. / タイムステップサンプリングのシフト、デフォルトはNone。",
+    )
+    parser.add_argument(
+        "--timestep_e_shift",
+        type=float,
+        default=None,
+        help="Shift for the timestep sampling, default is None. / タイムステップサンプリングのシフト、デフォルトはNone。",
+    )
+    parser.add_argument(
+        "--timestep_se_steps",
+        type=int,
+        default=None,
+        help="Number of steps for the timestep sampling, default is None. / タイムステップサンプリングのステップ数、デフォルトはNone。",
     )

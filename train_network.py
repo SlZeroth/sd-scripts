@@ -219,7 +219,7 @@ class NetworkTrainer:
         network,
         weight_dtype,
         train_unet,
-        is_train=True
+        is_train=True,
     ):
         # Sample noise, sample a random timestep for each image, and add noise to the latents,
         # with noise offset and/or multires noise if specified
@@ -330,7 +330,8 @@ class NetworkTrainer:
         tokenize_strategy: strategy_base.TokenizeStrategy, 
         is_train=True, 
         train_text_encoder=True, 
-        train_unet=True
+        train_unet=True,
+        global_step=None
     ) -> torch.Tensor:
         """
         Process a batch for the network
@@ -397,7 +398,8 @@ class NetworkTrainer:
             network,
             weight_dtype,
             train_unet,
-            is_train=is_train
+            is_train=is_train,
+            global_step=global_step
         )
 
         huber_c = train_util.get_huber_threshold_if_needed(args, timesteps, noise_scheduler)
@@ -1312,7 +1314,8 @@ class NetworkTrainer:
                         tokenize_strategy, 
                         is_train=True, 
                         train_text_encoder=train_text_encoder, 
-                        train_unet=train_unet
+                        train_unet=train_unet,
+                        global_step=global_step
                     )
 
                     accelerator.backward(loss)
