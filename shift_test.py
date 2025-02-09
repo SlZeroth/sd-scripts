@@ -47,6 +47,8 @@ def get_noisy_model_input_and_timesteps(args, noise_scheduler, latents, noise, d
     else:
         current_shift = args.discrete_flow_shift
 
+    noise_scheduler.config.shift = current_shift
+
     if args.timestep_sampling == "uniform" or args.timestep_sampling == "sigmoid":
         # 간단한 t 기반 노이즈 샘플링
         if args.timestep_sampling == "sigmoid":
