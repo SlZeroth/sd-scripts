@@ -416,15 +416,25 @@ def get_noisy_model_input_and_timesteps(
     sigmas = None
 
     if hasattr(args, "timestep_se_steps") and args.timestep_se_steps is not None:
-        if global_step < args.timestep_se_steps:
-            ratio = global_step / args.timestep_se_steps
-            current_shift = (1 - ratio) * args.discrete_flow_shift + ratio * args.timestep_e_shift
-        else:
+        if global_step >= args.timestep_se_steps:
             current_shift = args.timestep_e_shift
+        else:
+            current_shift = args.discrete_flow_shift
     else:
         # No dynamic shift; use the fixed shift.
         current_shift = args.discrete_flow_shift
     logger.info(f"step: {global_step}, current_shift: {current_shift}")
+
+    #     if hasattr(args, "timestep_se_steps") and args.timestep_se_steps is not None:
+    #     if global_step < args.timestep_se_steps:
+    #         ratio = global_step / args.timestep_se_steps
+    #         current_shift = (1 - ratio) * args.discrete_flow_shift + ratio * args.timestep_e_shift
+    #     else:
+    #         current_shift = args.timestep_e_shift
+    # else:
+    #     # No dynamic shift; use the fixed shift.
+    #     current_shift = args.discrete_flow_shift
+    # logger.info(f"step: {global_step}, current_shift: {current_shift}")
 
     if args.timestep_sampling == "uniform" or args.timestep_sampling == "sigmoid":
         # Simple random t-based noise sampling
