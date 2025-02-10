@@ -416,20 +416,20 @@ def get_noisy_model_input_and_timesteps(
     sigmas = None
 
     # timestep_se_steps 까지는 discrete_flow_shift 사용
-    if hasattr(args, "timestep_se_steps") and args.timestep_se_steps is not None:
-        if global_step >= args.timestep_se_steps:
-            # timestep_se_steps부터 250 스텝까지 점진적으로 timestep_e_shift로 변경
-            if global_step <= 250:
-                ratio = (global_step - args.timestep_se_steps) / (250 - args.timestep_se_steps)
-                current_shift = args.discrete_flow_shift + ratio * (args.timestep_e_shift - args.discrete_flow_shift)
-            else:
-                current_shift = args.timestep_e_shift
-        else:
-            current_shift = args.discrete_flow_shift
-    else:
-        # 동적 shift를 사용하지 않음; 고정된 shift 사용
-        current_shift = args.discrete_flow_shift
-    logger.info(f"step: {global_step}, current_shift: {current_shift}")
+    # if hasattr(args, "timestep_se_steps") and args.timestep_se_steps is not None:
+    #     if global_step >= args.timestep_se_steps:
+    #         # timestep_se_steps부터 250 스텝까지 점진적으로 timestep_e_shift로 변경
+    #         if global_step <= 250:
+    #             ratio = (global_step - args.timestep_se_steps) / (250 - args.timestep_se_steps)
+    #             current_shift = args.discrete_flow_shift + ratio * (args.timestep_e_shift - args.discrete_flow_shift)
+    #         else:
+    #             current_shift = args.timestep_e_shift
+    #     else:
+    #         current_shift = args.discrete_flow_shift
+    # else:
+    #     # 동적 shift를 사용하지 않음; 고정된 shift 사용
+    #     current_shift = args.discrete_flow_shift
+    # logger.info(f"step: {global_step}, current_shift: {current_shift}")
 
     # if hasattr(args, "timestep_se_steps") and args.timestep_se_steps is not None:
     #     if global_step >= args.timestep_se_steps:
@@ -441,16 +441,16 @@ def get_noisy_model_input_and_timesteps(
     #     current_shift = args.discrete_flow_shift
     # logger.info(f"step: {global_step}, current_shift: {current_shift}")
 
-    # if hasattr(args, "timestep_se_steps") and args.timestep_se_steps is not None:
-    #     if global_step < args.timestep_se_steps:
-    #         ratio = global_step / args.timestep_se_steps
-    #         current_shift = (1 - ratio) * args.discrete_flow_shift + ratio * args.timestep_e_shift
-    #     else:
-    #         current_shift = args.timestep_e_shift
-    # else:
-    #     # No dynamic shift; use the fixed shift.
-    #     current_shift = args.discrete_flow_shift
-    # logger.info(f"step: {global_step}, current_shift: {current_shift}")
+    if hasattr(args, "timestep_se_steps") and args.timestep_se_steps is not None:
+        if global_step < args.timestep_se_steps:
+            ratio = global_step / args.timestep_se_steps
+            current_shift = (1 - ratio) * args.discrete_flow_shift + ratio * args.timestep_e_shift
+        else:
+            current_shift = args.timestep_e_shift
+    else:
+        # No dynamic shift; use the fixed shift.
+        current_shift = args.discrete_flow_shift
+    logger.info(f"step: {global_step}, current_shift: {current_shift}")
 
     noise_scheduler.config.shift = current_shift
     noise_scheduler.set_timesteps(num_inference_steps=1000, device=device)
