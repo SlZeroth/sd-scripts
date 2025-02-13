@@ -7,10 +7,10 @@ class DummyArgs:
 
 # args 설정
 args = DummyArgs()
-args.timestep_sampling = "sigmoid"   # 또는 "sigmoid", "shift" 등 원하는 방식으로 선택
+args.timestep_sampling = "uniform"   # 또는 "sigmoid", "shift" 등 원하는 방식으로 선택
 args.discrete_flow_shift = 3.0         # 초기 shift 값
 args.timestep_e_shift = 0.7            # 최종 shift 값로 이동
-args.timestep_se_steps = None           # 동적 shift가 진행될 스텝 수 (없으면 None으로 설정)
+args.timestep_se_steps = 300           # 동적 shift가 진행될 스텝 수 (없으면 None으로 설정)
 args.sigmoid_scale = 1.0               # sigmoid 스케일
 
 # noise_scheduler는 사용되지 않으므로 None으로 둡니다.
@@ -46,8 +46,6 @@ def get_noisy_model_input_and_timesteps(args, noise_scheduler, latents, noise, d
             current_shift = args.timestep_e_shift
     else:
         current_shift = args.discrete_flow_shift
-
-    noise_scheduler.config.shift = current_shift
 
     if args.timestep_sampling == "uniform" or args.timestep_sampling == "sigmoid":
         # 간단한 t 기반 노이즈 샘플링
