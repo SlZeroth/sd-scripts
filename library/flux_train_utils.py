@@ -460,7 +460,7 @@ def get_noisy_model_input_and_timesteps(
         else:
             # 동적 shift를 사용하지 않음; 고정된 shift 사용
             current_shift = args.discrete_flow_shift
-            
+
     logger.info(f"step: {global_step}, current_shift: {current_shift}")
 
     # if global_step % 2 == 0:
@@ -701,7 +701,6 @@ def add_flux_train_arguments(parser: argparse.ArgumentParser):
     )
     parser.add_argument(
         "--timestep_static_shift",
-        type=bool,
-        default=False,
+        action="store_true",
         help="Whether to use dynamic shift for the timestep sampling, default is False. / タイムステップサンプリングの動的シフトを使用するかどうか、デフォルトはFalse。",
     )
