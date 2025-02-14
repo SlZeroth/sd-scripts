@@ -155,8 +155,8 @@ def simulate_timestep_distribution_at_global_step(global_step=100, n_batches=100
     # 필요한 인자들을 담은 args 생성
     args = SimpleNamespace(
         timestep_se_steps=100,         # 예: 100 스텝까지 동적 shift 적용
-        discrete_flow_shift=1.0,       # 초기 shift 값
-        timestep_e_shift=0.7,          # 100 스텝 이상부터 적용될 shift 값
+        discrete_flow_shift=3.5,       # 초기 shift 값
+        timestep_e_shift=1.0,          # 100 스텝 이상부터 적용될 shift 값
         timestep_sampling="sigmoid",   # "uniform", "sigmoid", "shift", "flux_shift" 등 선택 가능
         sigmoid_scale=1.0,
         weighting_scheme="default",

@@ -441,15 +441,26 @@ def get_noisy_model_input_and_timesteps(
     #     current_shift = args.discrete_flow_shift
     # logger.info(f"step: {global_step}, current_shift: {current_shift}")
 
-    if hasattr(args, "timestep_se_steps") and args.timestep_se_steps is not None:
-        if global_step < args.timestep_se_steps:
-            ratio = global_step / args.timestep_se_steps
-            current_shift = (1 - ratio) * args.discrete_flow_shift + ratio * args.timestep_e_shift
+    if not args.timestep_static_shift:
+        if hasattr(args, "timestep_se_steps") and args.timestep_se_steps is not None:
+            if global_step < args.timestep_se_steps:
+                ratio = global_step / args.timestep_se_steps
+                current_shift = (1 - ratio) * args.discrete_flow_shift + ratio * args.timestep_e_shift
+            else:
+                current_shift = args.timestep_e_shift
         else:
-            current_shift = args.timestep_e_shift
+            # No dynamic shift; use the fixed shift.
+            current_shift = args.discrete_flow_shift
     else:
-        # No dynamic shift; use the fixed shift.
-        current_shift = args.discrete_flow_shift
+        if hasattr(args, "timestep_se_steps") and args.timestep_se_steps is not None:
+            if global_step >= args.timestep_se_steps:
+                current_shift = args.timestep_e_shift
+            else:
+                current_shift = args.discrete_flow_shift
+        else:
+            # 동적 shift를 사용하지 않음; 고정된 shift 사용
+            current_shift = args.discrete_flow_shift
+            
     logger.info(f"step: {global_step}, current_shift: {current_shift}")
 
     # if global_step % 2 == 0:
@@ -670,12 +681,12 @@ def add_flux_train_arguments(parser: argparse.ArgumentParser):
         default=3.0,
         help="Discrete flow shift for the Euler Discrete Scheduler, default is 3.0. / Euler Discrete Schedulerの離散フローシフト、デフォルトは3.0。",
     )
-    parser.add_argument(
-        "--timestep_s_shift",
-        type=float,
-        default=None,
-        help="Shift for the timestep sampling, default is None. / タイムステップサンプリングのシフト、デフォルトはNone。",
-    )
+    # parser.add_argument(
+    #     "--timestep_s_shift",
+    #     type=float,
+    #     default=None,
+    #     help="Shift for the timestep sampling, default is None. / タイムステップサンプリングのシフト、デフォルトはNone。",
+    # )
     parser.add_argument(
         "--timestep_e_shift",
         type=float,
@@ -687,4 +698,10 @@ def add_flux_train_arguments(parser: argparse.ArgumentParser):
         type=int,
         default=None,
         help="Number of steps for the timestep sampling, default is None. / タイムステップサンプリングのステップ数、デフォルトはNone。",
+    )
+    parser.add_argument(
+        "--timestep_static_shift",
+        type=bool,
+        default=False,
+        help="Whether to use dynamic shift for the timestep sampling, default is False. / タイムステップサンプリングの動的シフトを使用するかどうか、デフォルトはFalse。",
     )
