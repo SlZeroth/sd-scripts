@@ -484,6 +484,7 @@ def get_noisy_model_input_and_timesteps(
         t = (t * current_shift) / (1 + (current_shift - 1) * t)
 
         timesteps = t * 1000.0
+        logger.info(f"selected timesteps: {timesteps}")
         t = t.view(-1, 1, 1, 1)
         noisy_model_input = (1 - t) * latents + t * noise
     elif args.timestep_sampling == "shift":
