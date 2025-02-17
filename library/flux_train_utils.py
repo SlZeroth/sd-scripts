@@ -481,7 +481,7 @@ def get_noisy_model_input_and_timesteps(
             t = torch.rand((bsz,), device=device)
 
         if global_step >= args.timestep_se_steps:
-            alpha = 2.0
+            alpha = 1.5
             t = args.timestep_e_shift * (t ** alpha)
         else:
             t = (t * current_shift) / (1 + (current_shift - 1) * t)
