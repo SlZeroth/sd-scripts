@@ -71,31 +71,33 @@ def get_noisy_model_input_and_timesteps(
         else:
             current_shift = args.timestep_e_shift
     else:
-        # 고정 shift 사용.
         current_shift = args.discrete_flow_shift
     logger.info(f"step: {global_step}, current_shift: {current_shift}")
 
     noise_scheduler.config.shift = current_shift
     noise_scheduler.set_timesteps(num_inference_steps=1000, device=device)
 
-    if args.timestep_sampling == "uniform" or args.timestep_sampling == "sigmoid":
+    if args.timestep_sampling in ["uniform", "sigmoid"]:
         # 간단한 t 기반 노이즈 샘플링
         if args.timestep_sampling == "sigmoid":
             t = torch.sigmoid(args.sigmoid_scale * torch.randn((bsz,), device=device))
         else:
             t = torch.rand((bsz,), device=device)
 
-        # shift 변환 적용
-        alpha = 2.0
-        t = args.timestep_e_shift * (t ** alpha)
+        # 전환: 100 스텝 이후에 비선형 변환 (여기서는 alpha=2.0)
+        if global_step >= args.timestep_se_steps:
+            alpha = 2.0
+            t = args.timestep_e_shift * (t ** alpha)
+        else:
+            t = (t * current_shift) / (1 + (current_shift - 1) * t)
+            
         timesteps = t * 1000.0
         t = t.view(-1, 1, 1, 1)
         noisy_model_input = (1 - t) * latents + t * noise
 
     elif args.timestep_sampling == "shift":
         shift = args.discrete_flow_shift
-        logits_norm = torch.randn(bsz, device=device)
-        logits_norm = logits_norm * args.sigmoid_scale
+        logits_norm = torch.randn(bsz, device=device) * args.sigmoid_scale
         timesteps = logits_norm.sigmoid()
         timesteps = (timesteps * shift) / (1 + (shift - 1) * timesteps)
 
@@ -104,13 +106,10 @@ def get_noisy_model_input_and_timesteps(
         noisy_model_input = (1 - t) * latents + t * noise
 
     elif args.timestep_sampling == "flux_shift":
-        logits_norm = torch.randn(bsz, device=device)
-        logits_norm = logits_norm * args.sigmoid_scale
+        logits_norm = torch.randn(bsz, device=device) * args.sigmoid_scale
         timesteps = logits_norm.sigmoid()
 
-        # shift 변환 적용
         timesteps = (timesteps * current_shift) / (1 + (current_shift - 1) * timesteps)
-
         mu = get_lin_function(y1=0.5, y2=1.15)((h // 2) * (w // 2))
         timesteps = time_shift(mu, 1.0, timesteps)
 
@@ -119,7 +118,6 @@ def get_noisy_model_input_and_timesteps(
         noisy_model_input = (1 - t) * latents + t * noise
 
     else:
-        # weighting_scheme에 따른 비균일 샘플링
         u = compute_density_for_timestep_sampling(
             weighting_scheme=args.weighting_scheme,
             batch_size=bsz,
@@ -129,35 +127,30 @@ def get_noisy_model_input_and_timesteps(
         )
         indices = (u * noise_scheduler.config.num_train_timesteps).long()
         timesteps = noise_scheduler.timesteps[indices].to(device=device)
-
-        # flow matching에 따른 노이즈 추가
         sigmas = get_sigmas(noise_scheduler, timesteps, device, n_dim=latents.ndim, dtype=dtype)
         noisy_model_input = sigmas * noise + (1.0 - sigmas) * latents
 
     return noisy_model_input.to(dtype), timesteps.to(dtype), sigmas
 
 # ----------------------------
-# 250 스텝 동안 timestep 분포를 수집하고 시각화하는 함수 (배치 사이즈 1)
+# 250 스텝 동안 선택된 t 값(타임스텝)의 분포를 시각화하는 함수 (배치 사이즈 1)
 
 def simulate_timestep_distribution_over_steps(n_steps=250):
-    # Seaborn 스타일 적용
     sns.set(style="whitegrid", context="talk")
     
     device = "cpu"
     dtype = torch.float32
     bsz = 1  # 배치 사이즈 1
-    h, w = 32, 32  # 이미지 크기
+    h, w = 32, 32
 
-    # 더미 latent와 noise 텐서를 생성
     latents = torch.randn(bsz, 3, h, w, device=device)
     noise = torch.randn(bsz, 3, h, w, device=device)
 
-    # 필요한 인자들을 담은 args 생성
     args = SimpleNamespace(
-        timestep_se_steps=100,         # 예: 100 스텝까지 동적 shift 적용
-        discrete_flow_shift=3.0,       # 초기 shift 값
-        timestep_e_shift=0.7,          # 100 스텝 이상부터 적용될 shift 값
-        timestep_sampling="sigmoid",   # "uniform", "sigmoid", "shift", "flux_shift" 등 선택 가능
+        timestep_se_steps=100,        # 100 스텝까지 동적 shift 적용
+        discrete_flow_shift=3.0,      # 초기 shift 값
+        timestep_e_shift=0.7,         # 100 스텝 이상부터 적용될 shift 값
+        timestep_sampling="sigmoid",  # "uniform", "sigmoid", "shift", "flux_shift" 등 선택 가능
         sigmoid_scale=1.0,
         weighting_scheme="default",
         logit_mean=0.0,
@@ -165,34 +158,25 @@ def simulate_timestep_distribution_over_steps(n_steps=250):
         mode_scale=1.0,
     )
 
-    # Dummy noise scheduler 생성
     noise_scheduler = DummyNoiseScheduler(device=device, num_train_timesteps=1000)
 
-    global_steps = list(range(n_steps))
-    selected_timesteps = []
-
-    for step in global_steps:
+    # 모든 스텝에서 선택된 t (또는 timesteps) 값을 수집합니다.
+    all_t_values = []
+    for step in range(n_steps):
         _, timesteps, _ = get_noisy_model_input_and_timesteps(
             args, noise_scheduler, latents, noise, device, dtype, step
         )
         # 배치 사이즈가 1이므로 단일 값 추출
-        timestep_val = timesteps.detach().cpu().item()
-        selected_timesteps.append(timestep_val)
-        logger.info(f"global step {step}, timestep: {timestep_val}")
+        t_val = timesteps.detach().cpu().item()
+        all_t_values.append(t_val)
+        logger.info(f"global step {step}, timestep: {t_val}")
 
-    # 시각화를 위해 global steps와 timestep 값을 numpy 배열로 변환
-    global_steps_np = np.array(global_steps)
-    selected_timesteps_np = np.array(selected_timesteps)
-
-    # 부드러운 선 그래프와 산점도 함께 출력
-    plt.figure(figsize=(12, 6))
-    plt.plot(global_steps_np, selected_timesteps_np, color='dodgerblue', linewidth=2, label='Timestep')
-    plt.scatter(global_steps_np, selected_timesteps_np, color='tomato', s=50, zorder=5, label='Samples')
-    
-    plt.xlabel("Global Step", fontsize=14)
-    plt.ylabel("Selected Timestep", fontsize=14)
-    plt.title("Smooth Timestep Distribution over 250 Training Steps", fontsize=16)
-    plt.legend(fontsize=12)
+    # 선택된 t 값의 분포를 히스토그램으로 시각화
+    plt.figure(figsize=(10, 6))
+    sns.histplot(all_t_values, bins=30, kde=True, color='dodgerblue')
+    plt.xlabel("Selected Timestep", fontsize=14)
+    plt.ylabel("Frequency", fontsize=14)
+    plt.title("Distribution of Selected Timesteps over 250 Training Steps", fontsize=16)
     plt.tight_layout()
     plt.show()
 
