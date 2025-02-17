@@ -469,8 +469,8 @@ def get_noisy_model_input_and_timesteps(
     #     current_shift = args.discrete_flow_shift
     # logger.info(f"step: {global_step}, current_shift: {current_shift}")
 
-    noise_scheduler.config.shift = current_shift
-    noise_scheduler.set_timesteps(num_inference_steps=1000, device=device)
+    # noise_scheduler.config.shift = current_shift
+    # noise_scheduler.set_timesteps(num_inference_steps=1000, device=device)
 
     if args.timestep_sampling == "uniform" or args.timestep_sampling == "sigmoid":
         # Simple random t-based noise sampling
