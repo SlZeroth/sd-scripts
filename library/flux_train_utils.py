@@ -480,8 +480,11 @@ def get_noisy_model_input_and_timesteps(
         else:
             t = torch.rand((bsz,), device=device)
 
-        # Apply the shift transformation.
-        t = (t * current_shift) / (1 + (current_shift - 1) * t)
+        if global_step >= args.timestep_se_steps:
+            alpha = 2.0
+            t = args.timestep_e_shift * (t ** alpha)
+        else:
+            t = (t * current_shift) / (1 + (current_shift - 1) * t)
 
         timesteps = t * 1000.0
         logger.info(f"selected timesteps: {timesteps}")

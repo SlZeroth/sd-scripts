@@ -1,6 +1,7 @@
 import torch
 import numpy as np
 import matplotlib.pyplot as plt
+import seaborn as sns
 from types import SimpleNamespace
 import logging
 
@@ -55,7 +56,7 @@ class DummyNoiseScheduler:
         self.timesteps = torch.linspace(0, self.config.num_train_timesteps - 1, steps=num_inference_steps, device=device)
 
 # ----------------------------
-# 제공해주신 get_noisy_model_input_and_timesteps 함수
+# get_noisy_model_input_and_timesteps 함수
 
 def get_noisy_model_input_and_timesteps(
     args, noise_scheduler, latents, noise, device, dtype, global_step
@@ -85,8 +86,8 @@ def get_noisy_model_input_and_timesteps(
             t = torch.rand((bsz,), device=device)
 
         # shift 변환 적용
-        t = (t * current_shift) / (1 + (current_shift - 1) * t)
-
+        alpha = 2.0
+        t = args.timestep_e_shift * (t ** alpha)
         timesteps = t * 1000.0
         t = t.view(-1, 1, 1, 1)
         noisy_model_input = (1 - t) * latents + t * noise
@@ -136,16 +137,15 @@ def get_noisy_model_input_and_timesteps(
     return noisy_model_input.to(dtype), timesteps.to(dtype), sigmas
 
 # ----------------------------
-# global_step=100일 때 timestep 분포를 수집하고 시각화하는 함수
+# 250 스텝 동안 timestep 분포를 수집하고 시각화하는 함수 (배치 사이즈 1)
 
-def simulate_timestep_distribution_at_global_step(global_step=100, n_batches=1000):
-    """
-    동일한 입력(latents, noise)으로 여러 번 get_noisy_model_input_and_timesteps()를 호출하여,
-    global_step=100일 때 선택되는 timestep 값의 분포를 확인합니다.
-    """
+def simulate_timestep_distribution_over_steps(n_steps=250):
+    # Seaborn 스타일 적용
+    sns.set(style="whitegrid", context="talk")
+    
     device = "cpu"
     dtype = torch.float32
-    bsz = 128  # 배치 사이즈 (각 배치마다 bsz개의 timestep이 선택됨)
+    bsz = 1  # 배치 사이즈 1
     h, w = 32, 32  # 이미지 크기
 
     # 더미 latent와 noise 텐서를 생성
@@ -155,8 +155,8 @@ def simulate_timestep_distribution_at_global_step(global_step=100, n_batches=100
     # 필요한 인자들을 담은 args 생성
     args = SimpleNamespace(
         timestep_se_steps=100,         # 예: 100 스텝까지 동적 shift 적용
-        discrete_flow_shift=3.5,       # 초기 shift 값
-        timestep_e_shift=1.0,          # 100 스텝 이상부터 적용될 shift 값
+        discrete_flow_shift=3.0,       # 초기 shift 값
+        timestep_e_shift=0.7,          # 100 스텝 이상부터 적용될 shift 값
         timestep_sampling="sigmoid",   # "uniform", "sigmoid", "shift", "flux_shift" 등 선택 가능
         sigmoid_scale=1.0,
         weighting_scheme="default",
@@ -167,25 +167,34 @@ def simulate_timestep_distribution_at_global_step(global_step=100, n_batches=100
 
     # Dummy noise scheduler 생성
     noise_scheduler = DummyNoiseScheduler(device=device, num_train_timesteps=1000)
-    
-    # 여러 번 호출하여 timestep 값을 수집 (전체 배치의 timestep 값 분포)
-    all_timesteps = []
-    for _ in range(n_batches):
+
+    global_steps = list(range(n_steps))
+    selected_timesteps = []
+
+    for step in global_steps:
         _, timesteps, _ = get_noisy_model_input_and_timesteps(
-            args, noise_scheduler, latents, noise, device, dtype, global_step
+            args, noise_scheduler, latents, noise, device, dtype, step
         )
-        # timesteps가 (bsz,) 혹은 (bsz, 1, 1, 1)일 수 있으므로 flatten
-        all_timesteps.append(timesteps.detach().cpu().numpy().flatten())
+        # 배치 사이즈가 1이므로 단일 값 추출
+        timestep_val = timesteps.detach().cpu().item()
+        selected_timesteps.append(timestep_val)
+        logger.info(f"global step {step}, timestep: {timestep_val}")
+
+    # 시각화를 위해 global steps와 timestep 값을 numpy 배열로 변환
+    global_steps_np = np.array(global_steps)
+    selected_timesteps_np = np.array(selected_timesteps)
+
+    # 부드러운 선 그래프와 산점도 함께 출력
+    plt.figure(figsize=(12, 6))
+    plt.plot(global_steps_np, selected_timesteps_np, color='dodgerblue', linewidth=2, label='Timestep')
+    plt.scatter(global_steps_np, selected_timesteps_np, color='tomato', s=50, zorder=5, label='Samples')
     
-    all_timesteps = np.concatenate(all_timesteps)
-    
-    # 히스토그램으로 분포 시각화 (0~1000 범위)
-    plt.figure(figsize=(8, 6))
-    plt.hist(all_timesteps, bins=50, range=(0, 1000), color='skyblue', edgecolor='black')
-    plt.xlabel("Timestep")
-    plt.ylabel("Frequency")
-    plt.title(f"Timestep Distribution at Global Step {global_step}")
+    plt.xlabel("Global Step", fontsize=14)
+    plt.ylabel("Selected Timestep", fontsize=14)
+    plt.title("Smooth Timestep Distribution over 250 Training Steps", fontsize=16)
+    plt.legend(fontsize=12)
+    plt.tight_layout()
     plt.show()
 
 if __name__ == "__main__":
-    simulate_timestep_distribution_at_global_step(global_step=100, n_batches=1000)
+    simulate_timestep_distribution_over_steps(n_steps=250)
