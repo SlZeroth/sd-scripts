@@ -84,12 +84,13 @@ def get_noisy_model_input_and_timesteps(
         else:
             t = torch.rand((bsz,), device=device)
 
-        # 전환: 100 스텝 이후에 비선형 변환 (여기서는 alpha=2.0)
-        if global_step >= args.timestep_se_steps:
-            alpha = 2.0
-            t = args.timestep_e_shift * (t ** alpha)
-        else:
-            t = (t * current_shift) / (1 + (current_shift - 1) * t)
+        # # 전환: 100 스텝 이후에 비선형 변환 (여기서는 alpha=2.0)
+        # if global_step >= args.timestep_se_steps:
+        #     alpha = 6.0
+        #     t = args.timestep_e_shift * (t ** alpha)
+        # else:
+        #     t = (t * current_shift) / (1 + (current_shift - 1) * t)
+        t = (t * current_shift) / (1 + (current_shift - 1) * t)
             
         timesteps = t * 1000.0
         t = t.view(-1, 1, 1, 1)
@@ -151,7 +152,7 @@ def simulate_timestep_distribution_over_steps(n_steps=250):
         discrete_flow_shift=3.0,      # 초기 shift 값
         timestep_e_shift=0.7,         # 100 스텝 이상부터 적용될 shift 값
         timestep_sampling="sigmoid",  # "uniform", "sigmoid", "shift", "flux_shift" 등 선택 가능
-        sigmoid_scale=1.0,
+        sigmoid_scale=0.2,
         weighting_scheme="default",
         logit_mean=0.0,
         logit_std=1.0,
