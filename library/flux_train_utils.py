@@ -515,8 +515,10 @@ def get_noisy_model_input_and_timesteps(
         if global_step < args.timestep_se_steps:
             # "14,49,19" 형태의 문자열을 리스트로 변환
             discrete_timesteps = [int(x.strip()) for x in args.fixed_timestep_stage.split(',')]
+            logger.info(f"global_step: {global_step}, discrete_timesteps: {discrete_timesteps}")
         else:
             discrete_timesteps = [int(x.strip()) for x in args.fixed_timestep_stage2.split(',')]
+            logger.info(f"global_step: {global_step}, discrete_timesteps: {discrete_timesteps}")
         
         num_values = len(discrete_timesteps)
 
