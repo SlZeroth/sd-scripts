@@ -511,24 +511,19 @@ def get_noisy_model_input_and_timesteps(
         timesteps = timesteps * 1000.0
         noisy_model_input = (1 - t) * latents + t * noise
     elif args.timestep_sampling == "sigmoid_deterministic":
-        # discrete_timesteps = [200, 300, 400, 500, 750, 900]
-        #         if global_step < 100:
-        #     discrete_timesteps = [600, 750, 800, 900]
-        # else:
-        #     discrete_timesteps = [50, 100, 150, 200, 400, 500]
-        # num_values = len(discrete_timesteps)
-        # num_values = len(discrete_timesteps)
-
-        if global_step < 100:
-            discrete_timesteps = [700, 800, 900]
+        import ast
+        # global_step 에 따라 사용할 discrete timestep 목록 선택 (문자열을 리스트로 변환)
+        if global_step < args.timestep_se_steps:
+            discrete_timesteps = ast.literal_eval(args.fixed_timestep_stage)
         else:
-            discrete_timesteps = [50, 100, 150, 200, 400, 500]
+            discrete_timesteps = ast.literal_eval(args.fixed_timestep_stage2)
+        
         num_values = len(discrete_timesteps)
 
         # global_step 을 활용하여 순환 인덱스를 계산 (배치 전체에 동일하게 적용)
         idx = global_step % num_values
-        chosen_timestep = discrete_timesteps[idx]  # 예: 200, 300, 400, 500 중 하나
-
+        chosen_timestep = discrete_timesteps[idx]
+        
         # 현재의 normalized t 값 (0~1 scale)
         current_t = torch.full((bsz,), chosen_timestep / 1000.0, device=device)
         
@@ -732,4 +727,16 @@ def add_flux_train_arguments(parser: argparse.ArgumentParser):
         "--timestep_static_shift",
         action="store_true",
         help="Whether to use dynamic shift for the timestep sampling, default is False. / タイムステップサンプリングの動的シフトを使用するかどうか、デフォルトはFalse。",
+    )
+    parser.add_argument(
+        "--fixed_timestep_stage",
+        type=str,
+        default=None,
+        help="Fixed timestep stage for the timestep sampling, default is None. / タイムステップサンプリングの固定ステージ、デフォルトはNone。",
+    )
+    parser.add_argument(
+        "--fixed_timestep_stage2",
+        type=str,
+        default=None,
+        help="Fixed timestep stage for the timestep sampling, default is None. / タイムステップサンプリングの固定ステージ、デフォルトはNone。",
     )
