@@ -511,12 +511,12 @@ def get_noisy_model_input_and_timesteps(
         timesteps = timesteps * 1000.0
         noisy_model_input = (1 - t) * latents + t * noise
     elif args.timestep_sampling == "sigmoid_deterministic":
-        import ast
-        # global_step 에 따라 사용할 discrete timestep 목록 선택 (문자열을 리스트로 변환)
+        # global_step 에 따라 사용할 discrete timestep 목록 선택
         if global_step < args.timestep_se_steps:
-            discrete_timesteps = ast.literal_eval(args.fixed_timestep_stage)
+            # "14,49,19" 형태의 문자열을 리스트로 변환
+            discrete_timesteps = [int(x.strip()) for x in args.fixed_timestep_stage.split(',')]
         else:
-            discrete_timesteps = ast.literal_eval(args.fixed_timestep_stage2)
+            discrete_timesteps = [int(x.strip()) for x in args.fixed_timestep_stage2.split(',')]
         
         num_values = len(discrete_timesteps)
 
