@@ -510,14 +510,26 @@ def get_noisy_model_input_and_timesteps(
         t = timesteps.view(-1, 1, 1, 1)
         timesteps = timesteps * 1000.0
         noisy_model_input = (1 - t) * latents + t * noise
-    elif args.timestep_sampling == "test_range":
-        # 800 ~ 1000 범위의 랜덤 timestep을 직접 선택 (배치마다 독립적으로 샘플링)
-        # torch.rand는 0~1 사이의 값을 반환하므로, 이를 800~1000 범위로 확장합니다.
-        timesteps = 800 + 200 * torch.rand((bsz,), device=device)
-        # t 값을 계산: 여기서는 timesteps를 1000으로 나누어 0~1 사이로 정규화
-        t = (timesteps / 1000.0).view(-1, 1, 1, 1)
-        # noisy_model_input 계산: t에 따라 latents와 noise를 혼합
-        print(f"timesteps: {timesteps}")
+    elif args.timestep_sampling == "manual":
+        if global_step < 100:
+            # global_step이 100 미만일 때: t ~ N(mean=0.75, std=0.1) with [0.5, 1.0]
+            mean = 0.75
+            std = 0.1
+            min_val = 0.5
+            max_val = 1.0
+        else:
+            # global_step이 100 이상일 때: t ~ N(mean=0.4, std=0.1) with [0.2, 0.6]
+            mean = 0.4
+            std = 0.1
+            min_val = 0.2
+            max_val = 0.6
+
+        # 정규분포에서 샘플링하고 원하는 범위로 clamp 합니다.
+        t_val = torch.normal(mean, std, size=(bsz,), device=device).clamp(min_val, max_val)
+        # t_val은 0~1 사이의 값입니다.
+        timesteps = t_val * 1000.0  # 예: 0.5 -> 500, 1.0 -> 1000 (또는 0.2->200, 0.6->600)
+        t = t_val.view(-1, 1, 1, 1)
+        print(f"global_step: {global_step}, manual t values: {t_val}")
         noisy_model_input = (1 - t) * latents + t * noise
     else:
         # Sample a random timestep for each image
@@ -664,7 +676,7 @@ def add_flux_train_arguments(parser: argparse.ArgumentParser):
 
     parser.add_argument(
         "--timestep_sampling",
-        choices=["sigma", "uniform", "sigmoid", "shift", "flux_shift", "test_range"],
+        choices=["sigma", "uniform", "sigmoid", "shift", "flux_shift", "manual"],
         default="sigma",
         help="Method to sample timesteps: sigma-based, uniform random, sigmoid of random normal, shift of sigmoid and FLUX.1 shifting."
         " / タイムステップをサンプリングする方法：sigma、random uniform、random normalのsigmoid、sigmoidのシフト、FLUX.1のシフト。",
