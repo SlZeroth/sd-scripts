@@ -510,27 +510,46 @@ def get_noisy_model_input_and_timesteps(
         t = timesteps.view(-1, 1, 1, 1)
         timesteps = timesteps * 1000.0
         noisy_model_input = (1 - t) * latents + t * noise
-    elif args.timestep_sampling == "manual":
-        if global_step < 100:
-            # global_step이 100 미만일 때: t ~ N(mean=0.75, std=0.1) with [0.5, 1.0]
-            mean = 0.75
-            std = 0.1
-            min_val = 0.5
-            max_val = 1.0
+    elif args.timestep_sampling == "sigmoid_deterministic":
+        # global_step에 따라 기준 shift 값 결정
+        if global_step < args.timestep_se_steps:
+            base_shift = args.discrete_flow_shift
         else:
-            # global_step이 100 이상일 때: t ~ N(mean=0.4, std=0.1) with [0.2, 0.6]
-            mean = 0.4
-            std = 0.1
-            min_val = 0.1
-            max_val = 0.7
+            base_shift = args.timestep_e_shift
 
-        # 정규분포에서 샘플링하고 원하는 범위로 clamp 합니다.
-        t_val = torch.normal(mean, std, size=(bsz,), device=device).clamp(min_val, max_val)
-        # t_val은 0~1 사이의 값입니다.
-        timesteps = t_val * 1000.0  # 예: 0.5 -> 500, 1.0 -> 1000 (또는 0.2->200, 0.6->600)
-        t = t_val.view(-1, 1, 1, 1)
-        print(f"global_step: {global_step}, manual t values: {t_val}")
-        noisy_model_input = (1 - t) * latents + t * noise
+        # base_shift를 기준으로 center_t 계산 (normalized scale, 0~1)
+        # center_t = (0.5 * base_shift) / (1 + (base_shift - 1) * 0.5)
+        center_t = (0.5 * base_shift) / (1 + (base_shift - 1) * 0.5)
+        center_final = center_t * 1000.0  # 최종 timestep 값 (예: 750 혹은 다른 값)
+
+        if global_step < args.timestep_se_steps:
+            # se_step 구간에서는 extreme 범위를 ±250 (final scale)로 잡음
+            lower_final = center_final - 250.0  # 예: 750 - 250 = 500
+            upper_final = center_final + 250.0  # 예: 750 + 250 = 1000
+
+            # normalized scale (0~1)로 변환
+            lower_t = lower_final / 1000.0
+            upper_t = upper_final / 1000.0
+
+            # se_step 진행 비율 (0 ~ 1)
+            se_ratio = global_step / args.timestep_se_steps
+
+            # 배치 내 인덱스에 따라 결정적인 extreme 선택:
+            # 짝수 인덱스 → lower extreme, 홀수 인덱스 → upper extreme
+            indices = torch.arange(bsz, device=device)
+            initial_t = torch.where(indices % 2 == 0,
+                                    torch.full((bsz,), lower_t, device=device),
+                                    torch.full((bsz,), upper_t, device=device))
+            
+            # 선형 보간: se_ratio=0이면 initial_t, se_ratio=1이면 center_t로 수렴
+            current_t = initial_t + se_ratio * (center_t - initial_t)
+        else:
+            # se_step 이후에는 모두 center_t (args.timestep_e_shift 기준) 사용
+            current_t = torch.full((bsz,), center_t, device=device)
+
+        timesteps = current_t * 1000.0
+        t_expanded = current_t.view(-1, 1, 1, 1)
+        noisy_model_input = (1 - t_expanded) * latents + t_expanded * noise
     else:
         # Sample a random timestep for each image
         # for weighting schemes where we sample timesteps non-uniformly
@@ -676,7 +695,7 @@ def add_flux_train_arguments(parser: argparse.ArgumentParser):
 
     parser.add_argument(
         "--timestep_sampling",
-        choices=["sigma", "uniform", "sigmoid", "shift", "flux_shift", "manual"],
+        choices=["sigma", "uniform", "sigmoid", "shift", "flux_shift", "sigmoid_deterministic"],
         default="sigma",
         help="Method to sample timesteps: sigma-based, uniform random, sigmoid of random normal, shift of sigmoid and FLUX.1 shifting."
         " / タイムステップをサンプリングする方法：sigma、random uniform、random normalのsigmoid、sigmoidのシフト、FLUX.1のシフト。",
