@@ -463,6 +463,7 @@ def get_noisy_model_input_and_timesteps(
 
     logger.info(f"step: {global_step}, current_shift: {current_shift}")
 
+
     # if global_step % 2 == 0:
     #     current_shift = args.timestep_e_shift
     # else:
@@ -508,6 +509,15 @@ def get_noisy_model_input_and_timesteps(
 
         t = timesteps.view(-1, 1, 1, 1)
         timesteps = timesteps * 1000.0
+        noisy_model_input = (1 - t) * latents + t * noise
+    elif args.timestep_sampling == "test_range":
+        # 800 ~ 1000 범위의 랜덤 timestep을 직접 선택 (배치마다 독립적으로 샘플링)
+        # torch.rand는 0~1 사이의 값을 반환하므로, 이를 800~1000 범위로 확장합니다.
+        timesteps = 800 + 200 * torch.rand((bsz,), device=device)
+        # t 값을 계산: 여기서는 timesteps를 1000으로 나누어 0~1 사이로 정규화
+        t = (timesteps / 1000.0).view(-1, 1, 1, 1)
+        # noisy_model_input 계산: t에 따라 latents와 noise를 혼합
+        print(f"timesteps: {timesteps}")
         noisy_model_input = (1 - t) * latents + t * noise
     else:
         # Sample a random timestep for each image
