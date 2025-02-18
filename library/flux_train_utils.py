@@ -511,7 +511,10 @@ def get_noisy_model_input_and_timesteps(
         timesteps = timesteps * 1000.0
         noisy_model_input = (1 - t) * latents + t * noise
     elif args.timestep_sampling == "sigmoid_deterministic":
-        discrete_timesteps = [100, 200, 300, 400, 500, 750, 900]
+        if global_step < 100:
+            discrete_timesteps = [600, 750, 800, 900]
+        else:
+            discrete_timesteps = [50, 100, 150, 200, 400, 500]
         num_values = len(discrete_timesteps)
 
         # global_step 을 활용하여 순환 인덱스를 계산 (배치 전체에 동일하게 적용)
