@@ -521,8 +521,8 @@ def get_noisy_model_input_and_timesteps(
             # global_step이 100 이상일 때: t ~ N(mean=0.4, std=0.1) with [0.2, 0.6]
             mean = 0.4
             std = 0.1
-            min_val = 0.2
-            max_val = 0.6
+            min_val = 0.1
+            max_val = 0.7
 
         # 정규분포에서 샘플링하고 원하는 범위로 clamp 합니다.
         t_val = torch.normal(mean, std, size=(bsz,), device=device).clamp(min_val, max_val)
