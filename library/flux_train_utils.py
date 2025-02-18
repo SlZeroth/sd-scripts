@@ -511,20 +511,27 @@ def get_noisy_model_input_and_timesteps(
         timesteps = timesteps * 1000.0
         noisy_model_input = (1 - t) * latents + t * noise
     elif args.timestep_sampling == "sigmoid_deterministic":
+        import random
         # global_step 에 따라 사용할 discrete timestep 목록 선택
         if global_step < args.timestep_se_steps:
             # "14,49,19" 형태의 문자열을 리스트로 변환
             discrete_timesteps = [int(x.strip()) for x in args.fixed_timestep_stage.split(',')]
-            logger.info(f"global_step: {global_step}, discrete_timesteps: {discrete_timesteps}")
         else:
             discrete_timesteps = [int(x.strip()) for x in args.fixed_timestep_stage2.split(',')]
-            logger.info(f"global_step: {global_step}, discrete_timesteps: {discrete_timesteps}")
         
         num_values = len(discrete_timesteps)
 
         # global_step 을 활용하여 순환 인덱스를 계산 (배치 전체에 동일하게 적용)
         idx = global_step % num_values
-        chosen_timestep = discrete_timesteps[idx]
+        if idx > 0:
+            lower_bound = discrete_timesteps[idx]
+            upper_bound = discrete_timesteps[idx - 1]
+            # lower_bound가 더 작은 값이어야 함 (예: 800과 950)
+            chosen_timestep = random.randint(lower_bound, upper_bound)
+            logger.info(f"Randomly chosen timestep between {upper_bound} and {lower_bound}: {chosen_timestep}")
+        else:
+            chosen_timestep = discrete_timesteps[idx]
+            logger.info(f"Chosen timestep: {chosen_timestep}")
         
         # 현재의 normalized t 값 (0~1 scale)
         current_t = torch.full((bsz,), chosen_timestep / 1000.0, device=device)
