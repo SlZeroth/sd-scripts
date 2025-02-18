@@ -511,43 +511,21 @@ def get_noisy_model_input_and_timesteps(
         timesteps = timesteps * 1000.0
         noisy_model_input = (1 - t) * latents + t * noise
     elif args.timestep_sampling == "sigmoid_deterministic":
-        # global_step에 따라 기준 shift 값 결정
-        if global_step < args.timestep_se_steps:
-            base_shift = args.discrete_flow_shift
-        else:
-            base_shift = args.timestep_e_shift
+        discrete_timesteps = [200, 300, 400, 500]
+        num_values = len(discrete_timesteps)
 
-        # base_shift를 기준으로 center_t 계산 (normalized scale, 0~1)
-        # center_t = (0.5 * base_shift) / (1 + (base_shift - 1) * 0.5)
-        center_t = (0.5 * base_shift) / (1 + (base_shift - 1) * 0.5)
-        center_final = center_t * 1000.0  # 최종 timestep 값 (예: 750 혹은 다른 값)
+        # global_step 을 활용하여 순환 인덱스를 계산 (배치 전체에 동일하게 적용)
+        idx = global_step % num_values
+        chosen_timestep = discrete_timesteps[idx]  # 예: 200, 300, 400, 500 중 하나
 
-        if global_step < args.timestep_se_steps:
-            # se_step 구간에서는 extreme 범위를 ±250 (final scale)로 잡음
-            lower_final = center_final - 250.0  # 예: 750 - 250 = 500
-            upper_final = center_final + 250.0  # 예: 750 + 250 = 1000
-
-            # normalized scale (0~1)로 변환
-            lower_t = lower_final / 1000.0
-            upper_t = upper_final / 1000.0
-
-            # se_step 진행 비율 (0 ~ 1)
-            se_ratio = global_step / args.timestep_se_steps
-
-            # 배치 내 인덱스에 따라 결정적인 extreme 선택:
-            # 짝수 인덱스 → lower extreme, 홀수 인덱스 → upper extreme
-            indices = torch.arange(bsz, device=device)
-            initial_t = torch.where(indices % 2 == 0,
-                                    torch.full((bsz,), lower_t, device=device),
-                                    torch.full((bsz,), upper_t, device=device))
-            
-            # 선형 보간: se_ratio=0이면 initial_t, se_ratio=1이면 center_t로 수렴
-            current_t = initial_t + se_ratio * (center_t - initial_t)
-        else:
-            # se_step 이후에는 모두 center_t (args.timestep_e_shift 기준) 사용
-            current_t = torch.full((bsz,), center_t, device=device)
-
-        timesteps = current_t * 1000.0
+        # 현재의 normalized t 값 (0~1 scale)
+        current_t = torch.full((bsz,), chosen_timestep / 1000.0, device=device)
+        
+        # 최종 timesteps (이미 final scale로 설정)
+        timesteps = torch.full((bsz,), chosen_timestep, device=device)
+        print(f"global_step: {global_step}, chosen_timestep: {chosen_timestep}")
+        
+        # 노이즈 적용: (1 - t) * latents + t * noise
         t_expanded = current_t.view(-1, 1, 1, 1)
         noisy_model_input = (1 - t_expanded) * latents + t_expanded * noise
     else:
