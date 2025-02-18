@@ -511,7 +511,7 @@ def get_noisy_model_input_and_timesteps(
         timesteps = timesteps * 1000.0
         noisy_model_input = (1 - t) * latents + t * noise
     elif args.timestep_sampling == "sigmoid_deterministic":
-        discrete_timesteps = [200, 300, 400, 500]
+        discrete_timesteps = [200, 300, 400, 500, 900]
         num_values = len(discrete_timesteps)
 
         # global_step 을 활용하여 순환 인덱스를 계산 (배치 전체에 동일하게 적용)
@@ -523,7 +523,7 @@ def get_noisy_model_input_and_timesteps(
         
         # 최종 timesteps (이미 final scale로 설정)
         timesteps = torch.full((bsz,), chosen_timestep, device=device)
-        print(f"global_step: {global_step}, chosen_timestep: {chosen_timestep}")
+        logger.info(f"global_step: {global_step}, chosen_timestep: {chosen_timestep}")
         
         # 노이즈 적용: (1 - t) * latents + t * noise
         t_expanded = current_t.view(-1, 1, 1, 1)
