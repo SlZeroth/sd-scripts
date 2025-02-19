@@ -413,6 +413,7 @@ class NetworkTrainer:
         loss_weights = batch["loss_weights"]  # 各sampleごとのweight
         loss = loss * loss_weights
 
+        # TODO : LOSS CUSTOM 함수 구현 SNR 같은거
         loss = self.post_process_loss(loss, args, timesteps, noise_scheduler)
 
         return loss.mean()

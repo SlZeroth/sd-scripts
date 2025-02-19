@@ -21,6 +21,10 @@ from library import (
     strategy_flux,
     train_util,
 )
+from library.custom_train_functions import (
+    apply_snr_weight,
+    apply_soft_snr_weight
+)
 from library.utils import setup_logging
 
 setup_logging()
@@ -487,6 +491,10 @@ class FluxNetworkTrainer(train_network.NetworkTrainer):
         return model_pred, target, timesteps, weighting
 
     def post_process_loss(self, loss, args, timesteps, noise_scheduler):
+        if args.min_snr_gamma:
+            loss = apply_snr_weight(loss, timesteps, noise_scheduler, args.min_snr_gamma, args.v_parameterization)
+        if args.soft_min_snr_gamma:
+            loss = apply_soft_snr_weight(loss, timesteps, noise_scheduler, args.soft_min_snr_gamma, args.v_parameterization)
         return loss
 
     def get_sai_model_spec(self, args):
@@ -503,6 +511,7 @@ class FluxNetworkTrainer(train_network.NetworkTrainer):
         metadata["ss_sigmoid_scale"] = args.sigmoid_scale
         metadata["ss_model_prediction_type"] = args.model_prediction_type
         metadata["ss_discrete_flow_shift"] = args.discrete_flow_shift
+        metadata["ss_soft_min_snr_gamma"] = args.soft_min_snr_gamma
 
     def is_text_encoder_not_needed_for_training(self, args):
         return args.cache_text_encoder_outputs and not self.is_train_text_encoder(args)
