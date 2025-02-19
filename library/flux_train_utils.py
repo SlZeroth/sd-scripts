@@ -560,6 +560,7 @@ def get_noisy_model_input_and_timesteps(
         sigmas = get_sigmas(noise_scheduler, timesteps, device, n_dim=latents.ndim, dtype=dtype)
         noisy_model_input = sigmas * noise + (1.0 - sigmas) * latents
 
+    os.makedirs(args.output_dir, exist_ok=True)
     with open(f"{args.output_dir}/selected_timesteps.txt", "a") as f:
         # timesteps는 배치가 1인 텐서이므로 .item()으로 값을 추출합니다.
         f.write(f"{timesteps.item()},")
