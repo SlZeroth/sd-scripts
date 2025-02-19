@@ -766,6 +766,13 @@ class FlowMatchEulerDiscreteScheduler(SchedulerMixin, ConfigMixin):
             self._step_index = self.index_for_timestep(timestep)
         else:
             self._step_index = self._begin_index
+    
+    # for snr_min TODO
+    def all_snr(self):
+        # self.sigmas: 각 timestep의 sigma 값, shape: (num_train_timesteps,)
+        # effective alpha = 1 - sigma
+        alpha = 1 - self.sigmas
+        return (alpha / self.sigmas) ** 2
 
     def step(
         self,
