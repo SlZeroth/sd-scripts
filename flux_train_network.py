@@ -581,7 +581,7 @@ def setup_parser() -> argparse.ArgumentParser:
     parser = train_network.setup_parser()
     train_util.add_dit_training_arguments(parser)
     flux_train_utils.add_flux_train_arguments(parser)
-    custom_train_functions.add_custom_train_arguments(parser)
+    # custom_train_functions.add_custom_train_arguments(parser)
 
     parser.add_argument(
         "--split_mode",
