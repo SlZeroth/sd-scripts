@@ -26,6 +26,7 @@ from library.custom_train_functions import (
     apply_soft_snr_weight,
     prepare_scheduler_for_custom_training
 )
+import library.custom_train_functions as custom_train_functions
 from library.utils import setup_logging
 
 setup_logging()
@@ -326,6 +327,8 @@ class FluxNetworkTrainer(train_network.NetworkTrainer):
     def get_noise_scheduler(self, args: argparse.Namespace, device: torch.device) -> Any:
         noise_scheduler = sd3_train_utils.FlowMatchEulerDiscreteScheduler(num_train_timesteps=1000, shift=args.discrete_flow_shift)
         prepare_scheduler_for_custom_training(noise_scheduler, device)
+        if args.zero_terminal_snr:
+            custom_train_functions.fix_noise_scheduler_betas_for_zero_terminal_snr(noise_scheduler)
         self.noise_scheduler_copy = copy.deepcopy(noise_scheduler)
         return noise_scheduler
 
@@ -578,6 +581,7 @@ def setup_parser() -> argparse.ArgumentParser:
     parser = train_network.setup_parser()
     train_util.add_dit_training_arguments(parser)
     flux_train_utils.add_flux_train_arguments(parser)
+    custom_train_functions.add_custom_train_arguments(parser)
 
     parser.add_argument(
         "--split_mode",
