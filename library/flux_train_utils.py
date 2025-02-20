@@ -16,6 +16,9 @@ from safetensors.torch import save_file
 
 from library import flux_models, flux_utils, strategy_base, train_util
 from library.device_utils import init_ipex, clean_memory_on_device
+from library.custom_train_functions import (
+    prepare_scheduler_for_custom_training
+)
 
 init_ipex()
 
@@ -409,6 +412,14 @@ def compute_loss_weighting_for_sd3(weighting_scheme: str, sigmas=None):
     return weighting
 
 
+def update_noise_scheduler_shift(noise_scheduler, new_shift, num_inference_steps, device):
+    # shift 값 업데이트
+    noise_scheduler.config.shift = new_shift
+    # timesteps와 sigmas 재설정: scheduler 내부에서 새로운 shift 값을 사용해 계산
+    noise_scheduler.set_timesteps(num_inference_steps=num_inference_steps, device=device)
+    # alphas_cumprod 및 all_snr 재계산
+    prepare_scheduler_for_custom_training(noise_scheduler, device)
+
 def get_noisy_model_input_and_timesteps(
     args, noise_scheduler, latents, noise, device, dtype, global_step
 ) -> Tuple[torch.Tensor, torch.Tensor, torch.Tensor]:
@@ -462,6 +473,7 @@ def get_noisy_model_input_and_timesteps(
             current_shift = args.discrete_flow_shift
 
     logger.info(f"step: {global_step}, current_shift: {current_shift}")
+    update_noise_scheduler_shift(noise_scheduler, current_shift, num_inference_steps=1000, device=device)
 
 
     # if global_step % 2 == 0:
