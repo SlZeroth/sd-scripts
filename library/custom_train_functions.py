@@ -25,6 +25,7 @@ def prepare_scheduler_for_custom_training(noise_scheduler, device):
     all_snr = (alpha / sigma) ** 2
 
     noise_scheduler.all_snr = all_snr.to(device)
+    noise_scheduler.all_timesteps = torch.linspace(0, 999, 1000).to(dtype=torch.long, device=device)
 
 
 def fix_noise_scheduler_betas_for_zero_terminal_snr(noise_scheduler):
