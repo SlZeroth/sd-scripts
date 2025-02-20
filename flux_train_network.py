@@ -326,8 +326,6 @@ class FluxNetworkTrainer(train_network.NetworkTrainer):
 
     def get_noise_scheduler(self, args: argparse.Namespace, device: torch.device) -> Any:
         noise_scheduler = sd3_train_utils.FlowMatchEulerDiscreteScheduler(num_train_timesteps=1000, shift=args.discrete_flow_shift)
-        # if args.zero_terminal_snr:
-        #     custom_train_functions.fix_noise_scheduler_betas_for_zero_terminal_snr(noise_scheduler)
         prepare_scheduler_for_custom_training(noise_scheduler, device)
 
         self.noise_scheduler_copy = copy.deepcopy(noise_scheduler)

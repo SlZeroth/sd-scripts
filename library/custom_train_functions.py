@@ -75,49 +75,49 @@ def apply_snr_weight(loss: torch.Tensor, timesteps: torch.IntTensor, noise_sched
     loss = loss * snr_weight
     return loss
 
-def apply_soft_snr_weight(loss, timesteps, noise_scheduler, gamma, v_prediction=False):
-    # 배치 크기가 1이라고 가정합니다. (noise_scheduler 에서 가져올 필요는 없음.)
-    # timesteps는 단일 값(텐서 길이 1)입니다.
-    t = timesteps.item()  # 예: 500 (0~1000 사이의 값)
-    
-    # noise_scheduler에서 제공하는 alphas_cumprod에서 해당 timestep의 값을 가져옵니다.
-    alphas_cumprod = noise_scheduler.alphas_cumprod
-    # timestep t에 해당하는 값으로 alpha와 sigma 계산
-    alpha = torch.sqrt(alphas_cumprod[t])
-    sigma = torch.sqrt(1.0 - alphas_cumprod[t])
-    
-    # SNR은 (alpha/sigma)^2로 정의됩니다.
-    snr = (alpha / sigma) ** 2
-
-    # soft_min_snr_gamma_weight 계산 (여기서는 예시로 1/(snr^2 + 1/gamma))
-    soft_min_snr_gamma_weight = 1 / (snr**2 + (1 / float(gamma)))
-    
-    # 디버깅용으로 SNR과 gamma 값을 파일에 기록합니다.
-    with open("snr.txt", "a") as myfile:
-        myfile.write(f"{snr.item()},{gamma}\n")
-    
-    # 손실에 가중치를 곱해 보정합니다.
-    loss = loss * soft_min_snr_gamma_weight
-    return loss
-
-
 # def apply_soft_snr_weight(loss, timesteps, noise_scheduler, gamma, v_prediction=False):
-#     snr = torch.stack([noise_scheduler.all_snr[t] for t in timesteps])
-#     # min_snr_gamma = torch.minimum(snr, torch.full_like(snr, gamma))
-#     soft_min_snr_gamma_weight = 1 / (torch.pow(snr, 2) + (1 / float(gamma)))
+#     # 배치 크기가 1이라고 가정합니다. (noise_scheduler 에서 가져올 필요는 없음.)
+#     # timesteps는 단일 값(텐서 길이 1)입니다.
+#     t = timesteps.item()  # 예: 500 (0~1000 사이의 값)
+    
+#     # noise_scheduler에서 제공하는 alphas_cumprod에서 해당 timestep의 값을 가져옵니다.
+#     alphas_cumprod = noise_scheduler.alphas_cumprod
+#     # timestep t에 해당하는 값으로 alpha와 sigma 계산
+#     alpha = torch.sqrt(alphas_cumprod[t])
+#     sigma = torch.sqrt(1.0 - alphas_cumprod[t])
+    
+#     # SNR은 (alpha/sigma)^2로 정의됩니다.
+#     snr = (alpha / sigma) ** 2
+
+#     # soft_min_snr_gamma_weight 계산 (여기서는 예시로 1/(snr^2 + 1/gamma))
+#     soft_min_snr_gamma_weight = 1 / (snr**2 + (1 / float(gamma)))
+    
+#     # 디버깅용으로 SNR과 gamma 값을 파일에 기록합니다.
 #     with open("snr.txt", "a") as myfile:
 #         myfile.write(f"{snr.item()},{gamma}\n")
-
-#     # with open("snrmin.txt", "a") as myfile:
-#     #     myfile.write(f"{min_snr_gamma.item()},{soft_min_snr_gamma.item()}\n")
-#     # print("soft_min_snr_gamma", soft_min_snr_gamma, 1 / (snr + (1 / float(gamma))))
-#     # print("min_snr_gamma", min_snr_gamma)
-#     # if v_prediction:
-#     #     snr_weight = torch.div(soft_min_snr_gamma, snr+1).float().to(loss.device)
-#     # else:
-#     #     snr_weight = torch.div(soft_min_snr_gamma, snr).float().to(loss.device)
+    
+#     # 손실에 가중치를 곱해 보정합니다.
 #     loss = loss * soft_min_snr_gamma_weight
 #     return loss
+
+
+def apply_soft_snr_weight(loss, timesteps, noise_scheduler, gamma, v_prediction=False):
+    snr = torch.stack([noise_scheduler.all_snr[t] for t in timesteps])
+    # min_snr_gamma = torch.minimum(snr, torch.full_like(snr, gamma))
+    soft_min_snr_gamma_weight = 1 / (torch.pow(snr, 2) + (1 / float(gamma)))
+    with open("snr.txt", "a") as myfile:
+        myfile.write(f"{snr.item()},{gamma}\n")
+
+    # with open("snrmin.txt", "a") as myfile:
+    #     myfile.write(f"{min_snr_gamma.item()},{soft_min_snr_gamma.item()}\n")
+    # print("soft_min_snr_gamma", soft_min_snr_gamma, 1 / (snr + (1 / float(gamma))))
+    # print("min_snr_gamma", min_snr_gamma)
+    # if v_prediction:
+    #     snr_weight = torch.div(soft_min_snr_gamma, snr+1).float().to(loss.device)
+    # else:
+    #     snr_weight = torch.div(soft_min_snr_gamma, snr).float().to(loss.device)
+    loss = loss * soft_min_snr_gamma_weight
+    return loss
 
 def scale_v_prediction_loss_like_noise_prediction(loss: torch.Tensor, timesteps: torch.IntTensor, noise_scheduler: DDPMScheduler):
     scale = get_snr_scale(timesteps, noise_scheduler)
