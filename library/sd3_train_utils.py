@@ -746,6 +746,7 @@ class FlowMatchEulerDiscreteScheduler(SchedulerMixin, ConfigMixin):
 
         self._step_index = None
         self._begin_index = None
+        self.alphas_cumprod = 1 / (self.sigmas ** 2 + 1)
 
     def index_for_timestep(self, timestep, schedule_timesteps=None):
         if schedule_timesteps is None:
